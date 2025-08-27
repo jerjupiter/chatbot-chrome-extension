@@ -1,17 +1,51 @@
 const storage = chrome.storage.sync;
+
+// 确保配置加载完成后再初始化聊天机器人
 chrome.storage.sync.get(['chatbotUrl'], function(result) {
   window.difyChatbotConfig = { 
     chatbotUrl: result.chatbotUrl,
   };
+  
+  // 配置加载完成后初始化
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', embedChatbot);
+  } else {
+    embedChatbot();
+  }
 });
-
-document.body.onload = embedChatbot;
 
 async function embedChatbot() {
   const difyChatbotConfig = window.difyChatbotConfig;
-  if (!difyChatbotConfig) {
-    console.warn('Dify Chatbot Url is empty or is not provided');
-    return;
+  
+  // 添加重试机制，以防配置还未加载完成
+  if (!difyChatbotConfig || !difyChatbotConfig.chatbotUrl) {
+    console.warn('Dify Chatbot Config not ready, retrying...');
+    
+    // 尝试重新获取配置
+    try {
+      const result = await new Promise((resolve, reject) => {
+        chrome.storage.sync.get(['chatbotUrl'], (result) => {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError);
+          } else {
+            resolve(result);
+          }
+        });
+      });
+      
+      window.difyChatbotConfig = { 
+        chatbotUrl: result.chatbotUrl,
+      };
+      
+      // 再次检查配置
+      if (!result.chatbotUrl) {
+        console.error('Dify Chatbot URL is empty or not provided. Please configure the extension by clicking the extension icon and setting the chatbot URL.');
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to load Dify Chatbot configuration:', error);
+      return;
+    }
   }
   const openIcon = `<svg
             id="openIcon"
@@ -45,13 +79,16 @@ async function embedChatbot() {
           />
         </svg>`;
 
+  // 使用更新后的配置
+  const finalConfig = window.difyChatbotConfig;
+
   // create iframe
   function createIframe() {
     const iframe = document.createElement('iframe');
     iframe.allow = "fullscreen;microphone"
     iframe.title = "dify chatbot bubble window"
     iframe.id = 'dify-chatbot-bubble-window'
-    iframe.src = difyChatbotConfig.chatbotUrl
+    iframe.src = finalConfig.chatbotUrl
     // Use rem units but apply zoom compensation
     iframe.style.cssText = `border: none !important; position: fixed !important; flex-direction: column !important; justify-content: space-between !important; box-shadow: rgba(150, 150, 150, 0.2) 0px 10px 30px 0px, rgba(150, 150, 150, 0.2) 0px 0px 0px 1px !important; bottom: 6.7rem !important; right: 1rem !important; width: 30rem !important; height: 48rem !important; border-radius: 0.75rem !important; display: flex !important; z-index: 2147483647 !important; overflow: hidden !important; left: unset !important; background-color: #F3F4F6 !important;`
     document.body.appendChild(iframe);
@@ -301,5 +338,5 @@ async function embedChatbot() {
   });
 
   // Simple initialization message
-  console.log('Chatbot elements initialized with zoom compensation');
+  console.log('Dify Chatbot extension successfully initialized with URL:', finalConfig.chatbotUrl);
 }
