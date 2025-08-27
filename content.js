@@ -61,25 +61,41 @@ async function embedChatbot() {
    * get page zoom level using the most reliable method
    */
   function getPageZoomLevel() {
-    // Use window.outerWidth and window.innerWidth to detect zoom
+    // Method 1: Use window.outerWidth and window.innerWidth to detect zoom
     // This is the most reliable cross-browser method
     let zoom = Math.round((window.outerWidth / window.innerWidth) * 100) / 100;
     
+    // If the primary method gives us a reasonable result, use it
+    if (!isNaN(zoom) && zoom > 0.1 && zoom < 10) {
+      return zoom;
+    }
+    
     // Fallback method using screen and window dimensions
-    if (isNaN(zoom) || zoom === 1) {
+    try {
       zoom = Math.round((screen.width / window.innerWidth) * window.devicePixelRatio * 100) / 100;
+      if (!isNaN(zoom) && zoom > 0.1 && zoom < 10) {
+        return zoom;
+      }
+    } catch (e) {
+      // Ignore errors and try next method
     }
     
     // Another fallback using a test element
-    if (isNaN(zoom) || zoom === 1) {
+    try {
       const testElement = document.createElement('div');
       testElement.style.cssText = 'position:absolute;left:-1000px;top:-1000px;width:100px;height:100px;';
       document.body.appendChild(testElement);
       zoom = testElement.offsetWidth / 100;
       document.body.removeChild(testElement);
+      if (!isNaN(zoom) && zoom > 0.1 && zoom < 10) {
+        return zoom;
+      }
+    } catch (e) {
+      // Ignore errors
     }
     
-    return zoom || 1;
+    // If all methods fail, assume 100% zoom
+    return 1.0;
   }
 
   /**
@@ -87,6 +103,13 @@ async function embedChatbot() {
    */
   function getInverseZoomScale() {
     const zoomLevel = getPageZoomLevel();
+    
+    // If zoom is 100% (1.0), don't apply any scaling compensation
+    // This ensures elements maintain their original size at 100%
+    if (Math.abs(zoomLevel - 1.0) < 0.05) {
+      return 1.0;
+    }
+    
     return 1 / zoomLevel;
   }
 
@@ -210,9 +233,10 @@ async function embedChatbot() {
   function updateElementsZoomScale() {
     const button = document.getElementById("dify-chatbot-bubble-button");
     const iframe = document.getElementById("dify-chatbot-bubble-window");
+    const zoomLevel = getPageZoomLevel();
     const inverseScale = getInverseZoomScale();
     
-    console.log('Updating zoom - Current zoom level:', 1/inverseScale, 'Inverse scale:', inverseScale);
+    console.log('Zoom Detection - Page zoom level:', zoomLevel, 'Applied scale:', inverseScale);
     
     if (button) {
       // Ensure button stays fixed in position and only update zoom
