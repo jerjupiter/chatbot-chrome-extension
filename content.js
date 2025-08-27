@@ -90,7 +90,8 @@ async function embedChatbot() {
     iframe.id = 'dify-chatbot-bubble-window'
     iframe.src = finalConfig.chatbotUrl
     // Use rem units but apply zoom compensation
-    iframe.style.cssText = `border: none !important; position: fixed !important; flex-direction: column !important; justify-content: space-between !important; box-shadow: rgba(150, 150, 150, 0.2) 0px 10px 30px 0px, rgba(150, 150, 150, 0.2) 0px 0px 0px 1px !important; bottom: 6.7rem !important; right: 1rem !important; width: 30rem !important; height: 48rem !important; border-radius: 0.75rem !important; display: flex !important; z-index: 2147483647 !important; overflow: hidden !important; left: unset !important; background-color: #F3F4F6 !important;`
+    // Position iframe away from the button: button width (50px) + button margin (1rem) + extra spacing (1rem) = ~5.125rem
+    iframe.style.cssText = `border: none !important; position: fixed !important; flex-direction: column !important; justify-content: space-between !important; box-shadow: rgba(150, 150, 150, 0.2) 0px 10px 30px 0px, rgba(150, 150, 150, 0.2) 0px 0px 0px 1px !important; bottom: 6.7rem !important; right: 5.25rem !important; width: 30rem !important; height: 48rem !important; border-radius: 0.75rem !important; display: flex !important; z-index: 2147483647 !important; overflow: hidden !important; left: unset !important; background-color: #F3F4F6 !important;`
     document.body.appendChild(iframe);
     
     // Apply zoom compensation to the iframe
