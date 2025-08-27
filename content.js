@@ -52,140 +52,46 @@ async function embedChatbot() {
     iframe.title = "dify chatbot bubble window"
     iframe.id = 'dify-chatbot-bubble-window'
     iframe.src = difyChatbotConfig.chatbotUrl
-    const inverseScale = getInverseZoomScale();
-    iframe.style.cssText = `border: none; position: fixed; flex-direction: column; justify-content: space-between; box-shadow: rgba(150, 150, 150, 0.2) 0px 10px 30px 0px, rgba(150, 150, 150, 0.2) 0px 0px 0px 1px; bottom: 6.7rem; right: 1rem; width: 30rem; height: 48rem; border-radius: 0.75rem; display: flex; z-index: 2147483647; overflow: hidden; left: unset; background-color: #F3F4F6; zoom: ${inverseScale};`
+    // Use rem units but apply zoom compensation
+    iframe.style.cssText = `border: none !important; position: fixed !important; flex-direction: column !important; justify-content: space-between !important; box-shadow: rgba(150, 150, 150, 0.2) 0px 10px 30px 0px, rgba(150, 150, 150, 0.2) 0px 0px 0px 1px !important; bottom: 6.7rem !important; right: 1rem !important; width: 30rem !important; height: 48rem !important; border-radius: 0.75rem !important; display: flex !important; z-index: 2147483647 !important; overflow: hidden !important; left: unset !important; background-color: #F3F4F6 !important;`
     document.body.appendChild(iframe);
+    
+    // Apply zoom compensation to the iframe
+    applyZoomCompensation(iframe);
   }
 
   /**
-   * get page zoom level using the most reliable method
+   * Get current page zoom level
    */
-  function getPageZoomLevel() {
-    // Method 1: Use window.outerWidth and window.innerWidth to detect zoom
-    // This is the most reliable cross-browser method
-    let zoom = Math.round((window.outerWidth / window.innerWidth) * 100) / 100;
-    
-    // If the primary method gives us a reasonable result, use it
-    if (!isNaN(zoom) && zoom > 0.1 && zoom < 10) {
-      return zoom;
-    }
-    
-    // Fallback method using screen and window dimensions
-    try {
-      zoom = Math.round((screen.width / window.innerWidth) * window.devicePixelRatio * 100) / 100;
-      if (!isNaN(zoom) && zoom > 0.1 && zoom < 10) {
-        return zoom;
-      }
-    } catch (e) {
-      // Ignore errors and try next method
-    }
-    
-    // Another fallback using a test element
-    try {
-      const testElement = document.createElement('div');
-      testElement.style.cssText = 'position:absolute;left:-1000px;top:-1000px;width:100px;height:100px;';
-      document.body.appendChild(testElement);
-      zoom = testElement.offsetWidth / 100;
-      document.body.removeChild(testElement);
-      if (!isNaN(zoom) && zoom > 0.1 && zoom < 10) {
-        return zoom;
-      }
-    } catch (e) {
-      // Ignore errors
-    }
-    
-    // If all methods fail, assume 100% zoom
-    return 1.0;
+  function getZoomLevel() {
+    // Most reliable method: use outerWidth/innerWidth ratio
+    return Math.round((window.outerWidth / window.innerWidth) * 100) / 100;
   }
 
   /**
-   * get inverse zoom scale to counter page zoom
+   * Apply zoom compensation to an element
    */
-  function getInverseZoomScale() {
-    const zoomLevel = getPageZoomLevel();
+  function applyZoomCompensation(element) {
+    if (!element) return;
     
-    // If zoom is 100% (1.0), don't apply any scaling compensation
-    // This ensures elements maintain their original size at 100%
-    if (Math.abs(zoomLevel - 1.0) < 0.05) {
-      return 1.0;
-    }
+    const zoomLevel = getZoomLevel();
+    const compensation = 1 / zoomLevel;
     
-    return 1 / zoomLevel;
+    // Apply zoom compensation
+    element.style.zoom = compensation;
+    
+    console.log(`Applied zoom compensation: ${compensation} (page zoom: ${zoomLevel})`);
   }
 
   /**
-   * rem to px
-   * @param {*} rem ：30rem
+   * Update zoom compensation for all elements
    */
-  function handleRemToPx(rem) {
-    if (!rem) return;
-    let pxValue = 0;
-    try {
-      const regex = /\d+/;
-      // extract the numeric part and convert it to a numeric type
-      const remValue = parseInt(regex.exec(rem)[0], 10);
-      const rootFontSize = parseFloat(
-        window.getComputedStyle(document.documentElement).fontSize
-      );
-      pxValue = remValue * rootFontSize;
-    } catch (error) {
-      console.error(error);
-    }
-    return pxValue;
-  }
-
-  /**
-   * support element drag
-   * @param {*} targetButton entry element
-   */
-  function handleElementDrag(targetButton) {
-    // define a variable to hold the mouse position
-    let mouseX = 0,
-      mouseY = 0,
-      offsetX = 0,
-      offsetY = 0;
-
-    // Listen for mouse press events, get mouse position and element position
-    targetButton.addEventListener("mousedown", function (event) {
-      // calculate mouse position
-      mouseX = event.clientX;
-      mouseY = event.clientY;
-
-      // calculate element position
-      const rect = targetButton.getBoundingClientRect();
-      offsetX = mouseX - rect.left;
-      offsetY = mouseY - rect.top;
-
-      // listen for mouse movement events
-      document.addEventListener("mousemove", onMouseMove);
-    });
-
-    // listen for mouse lift events and stop listening for mouse move events
-    document.addEventListener("mouseup", function () {
-      document.removeEventListener("mousemove", onMouseMove);
-    });
-
-    // the mouse moves the event handler to update the element position
-    function onMouseMove(event) {
-      // calculate element position
-      let newX = event.clientX - offsetX,
-        newY = event.clientY - offsetY;
-
-      // 计算视线边界
-      const viewportWidth = window.innerWidth,
-        viewportHeight = window.innerHeight;
-
-      const maxX = viewportWidth - targetButton.offsetWidth,
-        maxY = viewportHeight - targetButton.offsetHeight;
-
-      // application limitation
-      newX = Math.max(12, Math.min(newX, maxX));
-      newY = Math.max(12, Math.min(newY, maxY));
-
-      // update element position
-      targetButton.style.left = newX + "px";
-      targetButton.style.top = newY + "px";
-    }
+  function updateZoomCompensation() {
+    const button = document.getElementById("dify-chatbot-bubble-button");
+    const iframe = document.getElementById("dify-chatbot-bubble-window");
+    
+    if (button) applyZoomCompensation(button);
+    if (iframe) applyZoomCompensation(iframe);
   }
 
   const targetButton = document.getElementById("dify-chatbot-bubble-button");
@@ -194,16 +100,17 @@ async function embedChatbot() {
     // create button
     const containerDiv = document.createElement("div");
     containerDiv.id = 'dify-chatbot-bubble-button';
-    const inverseScale = getInverseZoomScale();
-    // Fixed positioning without drag capability - always stay on the right side
-    containerDiv.style.cssText = `position: fixed !important; bottom: 3rem !important; right: 1rem !important; width: 50px !important; height: 50px !important; border-radius: 25px !important; background-color: #155EEF !important; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 8px 0px !important; cursor: pointer !important; z-index: 2147483647 !important; transition: all 0.2s ease-in-out 0s !important; zoom: ${inverseScale} !important; left: unset !important; top: unset !important;`;
+    // Use rem units but apply zoom compensation
+    containerDiv.style.cssText = `position: fixed !important; bottom: 3rem !important; right: 1rem !important; width: 50px !important; height: 50px !important; border-radius: 25px !important; background-color: #155EEF !important; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 8px 0px !important; cursor: pointer !important; z-index: 2147483647 !important; transition: all 0.2s ease-in-out 0s !important; left: unset !important; top: unset !important;`;
+    
     const displayDiv = document.createElement('div');
     displayDiv.style.cssText = "display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; z-index: 2147483647;";
     displayDiv.innerHTML = openIcon;
     containerDiv.appendChild(displayDiv);
     document.body.appendChild(containerDiv);
-    // Remove drag functionality - keep button fixed
-    // handleElementDrag(containerDiv);
+
+    // Apply initial zoom compensation
+    applyZoomCompensation(containerDiv);
 
     // add click event to control iframe display
     containerDiv.addEventListener('click', function () {
@@ -222,74 +129,48 @@ async function embedChatbot() {
       }
     });
   } else {
-    // Reset existing button position and remove drag capability
-    const inverseScale = getInverseZoomScale();
-    targetButton.style.cssText = `position: fixed !important; bottom: 3rem !important; right: 1rem !important; width: 50px !important; height: 50px !important; border-radius: 25px !important; background-color: #155EEF !important; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 8px 0px !important; cursor: pointer !important; z-index: 2147483647 !important; transition: all 0.2s ease-in-out 0s !important; zoom: ${inverseScale} !important; left: unset !important; top: unset !important;`;
-    // Remove any existing drag functionality
-    // handleElementDrag(targetButton);
+    // Reset existing button and apply zoom compensation
+    targetButton.style.cssText = `position: fixed !important; bottom: 3rem !important; right: 1rem !important; width: 50px !important; height: 50px !important; border-radius: 25px !important; background-color: #155EEF !important; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 8px 0px !important; cursor: pointer !important; z-index: 2147483647 !important; transition: all 0.2s ease-in-out 0s !important; left: unset !important; top: unset !important;`;
+    applyZoomCompensation(targetButton);
   }
 
-  // function to update zoom scale for existing elements
-  function updateElementsZoomScale() {
-    const button = document.getElementById("dify-chatbot-bubble-button");
-    const iframe = document.getElementById("dify-chatbot-bubble-window");
-    const zoomLevel = getPageZoomLevel();
-    const inverseScale = getInverseZoomScale();
-    
-    console.log('Zoom Detection - Page zoom level:', zoomLevel, 'Applied scale:', inverseScale);
-    
-    if (button) {
-      // Ensure button stays fixed in position and only update zoom
-      button.style.cssText = `position: fixed !important; bottom: 3rem !important; right: 1rem !important; width: 50px !important; height: 50px !important; border-radius: 25px !important; background-color: #155EEF !important; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 8px 0px !important; cursor: pointer !important; z-index: 2147483647 !important; transition: all 0.2s ease-in-out 0s !important; zoom: ${inverseScale} !important; left: unset !important; top: unset !important;`;
-    }
-    
-    if (iframe) {
-      iframe.style.zoom = inverseScale;
-    }
-  }
-
-  // Simple and reliable zoom change detection
-  let lastZoomLevel = getPageZoomLevel();
+  // Monitor zoom changes and update compensation
+  let currentZoom = getZoomLevel();
   
-  function checkZoomChange() {
-    try {
-      const currentZoomLevel = getPageZoomLevel();
-      if (Math.abs(currentZoomLevel - lastZoomLevel) > 0.05) {
-        console.log('Zoom changed from', lastZoomLevel, 'to', currentZoomLevel);
-        lastZoomLevel = currentZoomLevel;
-        updateElementsZoomScale();
-      }
-    } catch (error) {
-      console.error('Error checking zoom:', error);
+  function checkAndUpdateZoom() {
+    const newZoom = getZoomLevel();
+    if (Math.abs(newZoom - currentZoom) > 0.01) {
+      console.log(`Zoom changed from ${currentZoom} to ${newZoom}`);
+      currentZoom = newZoom;
+      updateZoomCompensation();
     }
   }
   
-  // Apply initial zoom correction after a delay
-  setTimeout(() => {
-    updateElementsZoomScale();
-  }, 500);
+  // Initial zoom compensation
+  setTimeout(updateZoomCompensation, 100);
   
-  // Check for zoom changes at regular intervals
-  setInterval(checkZoomChange, 1000);
+  // Monitor zoom changes
+  setInterval(checkAndUpdateZoom, 500);
   
-  // Listen for various events that might indicate zoom changes
-  ['resize', 'focus', 'load'].forEach(eventType => {
-    window.addEventListener(eventType, () => {
-      setTimeout(checkZoomChange, 100);
-    });
+  // Listen for zoom-related events
+  window.addEventListener('resize', () => {
+    setTimeout(checkAndUpdateZoom, 100);
   });
   
-  // Listen for wheel events with Ctrl key (zoom shortcuts)
-  document.addEventListener('wheel', (e) => {
-    if (e.ctrlKey) {
-      setTimeout(checkZoomChange, 200);
-    }
-  });
-  
-  // Listen for keyboard shortcuts (Ctrl+Plus, Ctrl+Minus, Ctrl+0)
+  // Listen for zoom shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
-      setTimeout(checkZoomChange, 200);
+      setTimeout(checkAndUpdateZoom, 100);
     }
   });
+  
+  // Listen for mouse wheel zoom
+  document.addEventListener('wheel', (e) => {
+    if (e.ctrlKey) {
+      setTimeout(checkAndUpdateZoom, 100);
+    }
+  });
+
+  // Simple initialization message
+  console.log('Chatbot elements initialized with zoom compensation');
 }
