@@ -61,6 +61,90 @@ async function embedChatbot() {
   }
 
   /**
+   * Support vertical dragging while keeping element pinned to right edge
+   * @param {*} targetButton entry element
+   */
+  function handleVerticalDrag(targetButton) {
+    let isDragging = false;
+    let startMouseY = 0;
+    let startElementY = 0;
+
+    targetButton.addEventListener("mousedown", function (event) {
+      if (event.target === targetButton || targetButton.contains(event.target)) {
+        isDragging = true;
+        startMouseY = event.clientY;
+        
+        // Get element's current position in the viewport coordinate system
+        const rect = targetButton.getBoundingClientRect();
+        startElementY = rect.top;
+        
+        console.log(`Drag start - Mouse Y: ${startMouseY}, Element rect top: ${startElementY}`);
+        
+        // Disable transitions and text selection during drag
+        document.body.style.userSelect = 'none';
+        targetButton.style.transition = 'none';
+        
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+        
+        event.preventDefault();
+      }
+    });
+
+    function onMouseMove(event) {
+      if (!isDragging) return;
+      
+      const currentMouseY = event.clientY;
+      const mouseDeltaY = currentMouseY - startMouseY;
+      
+      // Calculate where we want the element to be in viewport coordinates
+      let targetViewportY = startElementY + mouseDeltaY;
+      
+      // Get current zoom information
+      const pageZoomLevel = getZoomLevel();
+      const zoomCompensation = 1 / pageZoomLevel;
+      
+      // Apply boundary constraints in viewport coordinates first
+      const buttonHeight = 50 * zoomCompensation; // Button height after zoom compensation
+      const viewportHeight = window.innerHeight;
+      
+      targetViewportY = Math.max(10, Math.min(targetViewportY, viewportHeight - buttonHeight - 10));
+      
+      // Now convert to element coordinate system
+      // Since the element has zoom compensation applied, we need to scale the position
+      const elementY = targetViewportY / zoomCompensation;
+      
+      // Set position
+      targetButton.style.top = elementY + 'px';
+      targetButton.style.bottom = 'unset';
+      targetButton.style.right = '1rem';
+      targetButton.style.left = 'unset';
+      
+      // Debug output
+      const currentRect = targetButton.getBoundingClientRect();
+      console.log(`Mouse Y: ${currentMouseY} (Δ${mouseDeltaY}), Target viewport Y: ${targetViewportY}, Element Y: ${elementY}, Actual rect top: ${currentRect.top}, Zoom: ${pageZoomLevel}`);
+      
+      event.preventDefault();
+    }
+
+    function onMouseUp(event) {
+      if (isDragging) {
+        isDragging = false;
+        document.body.style.userSelect = '';
+        targetButton.style.transition = 'all 0.2s ease-in-out 0s';
+        
+        const finalRect = targetButton.getBoundingClientRect();
+        console.log(`Drag end - Final viewport top: ${finalRect.top}, CSS top: ${targetButton.style.top}`);
+        
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        
+        event.preventDefault();
+      }
+    }
+  }
+
+  /**
    * Get current page zoom level
    */
   function getZoomLevel() {
@@ -81,6 +165,7 @@ async function embedChatbot() {
     element.style.zoom = compensation;
     
     console.log(`Applied zoom compensation: ${compensation} (page zoom: ${zoomLevel})`);
+    return compensation;
   }
 
   /**
@@ -90,8 +175,32 @@ async function embedChatbot() {
     const button = document.getElementById("dify-chatbot-bubble-button");
     const iframe = document.getElementById("dify-chatbot-bubble-window");
     
-    if (button) applyZoomCompensation(button);
-    if (iframe) applyZoomCompensation(iframe);
+    if (button) {
+      // Store current position before applying zoom compensation
+      const wasUsingTop = button.style.top && button.style.top !== 'unset';
+      const currentTop = button.style.top;
+      const currentBottom = button.style.bottom;
+      
+      // Apply zoom compensation
+      applyZoomCompensation(button);
+      
+      // Restore position after zoom compensation
+      if (wasUsingTop && currentTop) {
+        button.style.top = currentTop;
+        button.style.bottom = 'unset';
+      } else if (currentBottom && currentBottom !== 'unset') {
+        button.style.bottom = currentBottom;
+        button.style.top = 'unset';
+      }
+      
+      // Always ensure right positioning
+      button.style.right = '1rem';
+      button.style.left = 'unset';
+    }
+    
+    if (iframe) {
+      applyZoomCompensation(iframe);
+    }
   }
 
   const targetButton = document.getElementById("dify-chatbot-bubble-button");
@@ -100,38 +209,58 @@ async function embedChatbot() {
     // create button
     const containerDiv = document.createElement("div");
     containerDiv.id = 'dify-chatbot-bubble-button';
-    // Use rem units but apply zoom compensation
-    containerDiv.style.cssText = `position: fixed !important; bottom: 3rem !important; right: 1rem !important; width: 50px !important; height: 50px !important; border-radius: 25px !important; background-color: #155EEF !important; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 8px 0px !important; cursor: pointer !important; z-index: 2147483647 !important; transition: all 0.2s ease-in-out 0s !important; left: unset !important; top: unset !important;`;
+    // Use rem units but apply zoom compensation - change cursor to ns-resize for vertical drag
+    containerDiv.style.cssText = `position: fixed !important; bottom: 3rem !important; right: 1rem !important; width: 50px !important; height: 50px !important; border-radius: 25px !important; background-color: #155EEF !important; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 8px 0px !important; cursor: ns-resize !important; z-index: 2147483647 !important; transition: all 0.2s ease-in-out 0s !important; left: unset !important; top: unset !important;`;
     
     const displayDiv = document.createElement('div');
-    displayDiv.style.cssText = "display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; z-index: 2147483647;";
+    displayDiv.style.cssText = "display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; z-index: 2147483647; pointer-events: none;"; // pointer-events: none so clicks pass through to parent
     displayDiv.innerHTML = openIcon;
     containerDiv.appendChild(displayDiv);
     document.body.appendChild(containerDiv);
 
     // Apply initial zoom compensation
     applyZoomCompensation(containerDiv);
+    
+    // Enable vertical dragging
+    handleVerticalDrag(containerDiv);
 
-    // add click event to control iframe display
-    containerDiv.addEventListener('click', function () {
-      const targetIframe = document.getElementById('dify-chatbot-bubble-window');
-      if (!targetIframe) {
-        createIframe();
-        displayDiv.innerHTML = closeIcon;
-        return;
-      }
-      if (targetIframe.style.display === "none") {
-        targetIframe.style.display = "block";
-        displayDiv.innerHTML = closeIcon;
-      } else {
-        targetIframe.style.display = "none";
-        displayDiv.innerHTML = openIcon;
+    // add click event to control iframe display - needs to distinguish from drag
+    let clickStartTime = 0;
+    let clickStartY = 0;
+    
+    containerDiv.addEventListener('mousedown', function(e) {
+      clickStartTime = Date.now();
+      clickStartY = e.clientY;
+    });
+    
+    containerDiv.addEventListener('mouseup', function(e) {
+      const clickDuration = Date.now() - clickStartTime;
+      const clickDistance = Math.abs(e.clientY - clickStartY);
+      
+      // Only treat as click if it was quick and didn't move much
+      if (clickDuration < 200 && clickDistance < 5) {
+        const targetIframe = document.getElementById('dify-chatbot-bubble-window');
+        if (!targetIframe) {
+          createIframe();
+          displayDiv.innerHTML = closeIcon;
+          return;
+        }
+        if (targetIframe.style.display === "none") {
+          targetIframe.style.display = "block";
+          displayDiv.innerHTML = closeIcon;
+        } else {
+          targetIframe.style.display = "none";
+          displayDiv.innerHTML = openIcon;
+        }
       }
     });
   } else {
     // Reset existing button and apply zoom compensation
-    targetButton.style.cssText = `position: fixed !important; bottom: 3rem !important; right: 1rem !important; width: 50px !important; height: 50px !important; border-radius: 25px !important; background-color: #155EEF !important; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 8px 0px !important; cursor: pointer !important; z-index: 2147483647 !important; transition: all 0.2s ease-in-out 0s !important; left: unset !important; top: unset !important;`;
+    targetButton.style.cssText = `position: fixed !important; bottom: 3rem !important; right: 1rem !important; width: 50px !important; height: 50px !important; border-radius: 25px !important; background-color: #155EEF !important; box-shadow: rgba(0, 0, 0, 0.2) 0px 4px 8px 0px !important; cursor: ns-resize !important; z-index: 2147483647 !important; transition: all 0.2s ease-in-out 0s !important; left: unset !important; top: unset !important;`;
     applyZoomCompensation(targetButton);
+    
+    // Enable vertical dragging for existing button
+    handleVerticalDrag(targetButton);
   }
 
   // Monitor zoom changes and update compensation
